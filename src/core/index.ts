@@ -36,6 +36,15 @@ export {
 } from "./validate.ts";
 
 export {
+  assignmentsForItem,
+  itemMode,
+  replaceItemAssignments,
+  tapSharer,
+  switchMode,
+  setPersonValue,
+} from "./assign.ts";
+
+export {
   ACCENT_KEYS,
   type AccentKey,
   AVATAR_POOL,
