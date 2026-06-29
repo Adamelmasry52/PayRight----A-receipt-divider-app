@@ -85,7 +85,16 @@ function reducer(state: Bill, action: Action): Bill {
     case "SET_ASSIGNMENTS":
       return { ...state, assignments: action.assignments };
     case "SET_PAYER":
-      return { ...state, payerId: action.payerId };
+      // payerId is the source of truth; mirror it onto Person.isPayer so the
+      // model stays coherent for later URL encoding.
+      return {
+        ...state,
+        payerId: action.payerId,
+        people: state.people.map((p) => ({
+          ...p,
+          isPayer: p.id === action.payerId,
+        })),
+      };
     default:
       return state;
   }

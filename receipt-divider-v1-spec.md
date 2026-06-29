@@ -100,7 +100,7 @@ to the printed total.
 1. **Start** — "Scan receipt" / "Enter manually" / (if the URL carries bill data) "View shared bill".
 2. **Capture → preprocess → OCR** (with a clear loading state).
 3. **Review & edit** items; confirm subtotal & total.
-4. **Add people** — name + auto-assigned animal avatar + accent color. Mark the payer (crown).
+4. **Add people** — name + auto-assigned fruit avatar + accent color. Mark the payer (crown).
 5. **Assign items** — tap an item, tap people, pick a split mode (whole / equal / by quantity / custom %).
 6. **Summary / settle-up** — each person's share; "Paid / Bill" with green/red check; optional
    "owes [payer]" framing when a payer is marked.
@@ -134,10 +134,10 @@ interface Bill {
 
 ## 6. Avatars
 
-A **fixed, curated set** of ~24–30 animal SVGs (open-licensed — e.g. a Twemoji / OpenMoji
+A **fixed, curated set** of ~24–30 fruit SVGs (open-licensed — e.g. a Twemoji / OpenMoji
 subset, with attribution where the license requires it; do **not** reuse Google's artwork).
 Not runtime procedural generation. Assignment is deterministic with no duplicates within a
-single bill; each animal pairs with an accent color from a fixed palette. The payer's animal
+single bill; each fruit pairs with an accent color from a fixed palette. The payer's fruit
 wears a crown overlay.
 
 ---
@@ -182,6 +182,6 @@ case would require a short-link service — flagged as out of scope for v1.
 ## 10. Design direction (starting point; refine in Claude Design later if desired)
 
 Mobile-first, clean, friendly, fast. Large tap targets (assignment is tap-driven). Strong
-numeric hierarchy so prices and totals read instantly. The animal avatars + accent colors
+numeric hierarchy so prices and totals read instantly. The fruit avatars + accent colors
 carry the personality. The green/red validation check is a key visual signal. Keep the
 scan → review → assign → summary flow to as few taps as possible.

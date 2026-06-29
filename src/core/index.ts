@@ -34,3 +34,17 @@ export {
   type BillDraftValidation,
   type ItemIssue,
 } from "./validate.ts";
+
+export {
+  ACCENT_KEYS,
+  type AccentKey,
+  AVATAR_POOL,
+  type AvatarId,
+  nextAvatar,
+  nextAccent,
+  createPerson,
+  addPerson,
+  renamePerson,
+  removePerson,
+  togglePayer,
+} from "./people.ts";

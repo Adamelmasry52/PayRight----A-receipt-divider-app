@@ -11,6 +11,7 @@ import {
   computeRawShares,
   settleUp,
 } from "./split.ts";
+import { MONEY_EPSILON } from "./rounding.ts";
 
 // ---- test builders -------------------------------------------------------
 
@@ -320,5 +321,45 @@ describe("settleUp — ceiling never underpays", () => {
 describe("computeSubtotal", () => {
   it("sums lineTotal = unitPrice * qty", () => {
     expect(computeSubtotal([item("a", 30, 3), item("b", 10, 2)])).toBe(110);
+  });
+});
+
+describe("ceiling boundary vs MONEY_EPSILON", () => {
+  const p1 = person("solo", true);
+
+  it("a share a hair above a cent boundary ceils UP, never down", () => {
+    // One person takes a whole 10.00 item; a 0.001% uplift makes the raw share
+    // 10.0001 — genuinely above 10.00, far larger than float noise. It must
+    // ceil to 10.01 so the bill is never underpaid.
+    const a = item("Mint Tea", 10);
+    const b1 = bill({
+      items: [a],
+      total: 10.0001, // f = 1.00001 → raw share = 10.0001
+      people: [p1],
+      assignments: [assign(a.id, p1.id, "whole")],
+    });
+    const s = settleUp(b1);
+    expect(s.shares[0].raw).toBeCloseTo(10.0001, 9);
+    expect(s.shares[0].final).toBe(10.01); // up, not 10.00
+    expect(s.totalPaid).toBeGreaterThanOrEqual(s.total);
+
+    // The guard epsilon is float-noise scale: orders of magnitude below a real
+    // sub-cent amount, so it can absorb 1e-16 jitter without ever eating 0.0001.
+    expect(MONEY_EPSILON).toBeLessThan(0.0001);
+  });
+
+  it("a share that is mathematically an exact cent stays put despite float jitter", () => {
+    // 0.1 + 0.2 worth of items → raw 0.30000000000000004; must ceil to 0.30,
+    // not 0.31. This is the noise the epsilon exists to absorb.
+    const a = item("a", 0.1);
+    const b = item("b", 0.2);
+    const b1 = bill({
+      items: [a, b],
+      total: 0.3, // f = 1, raw = 0.1 + 0.2 = 0.30000000000000004
+      people: [p1],
+      assignments: [assign(a.id, p1.id, "whole"), assign(b.id, p1.id, "whole")],
+    });
+    const s = settleUp(b1);
+    expect(s.shares[0].final).toBe(0.3);
   });
 });
