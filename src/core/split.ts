@@ -233,3 +233,38 @@ export function settleUp(bill: Bill, options: SettleOptions = {}): Settlement {
 
   return { upliftFactor: f, subtotal, total: bill.total, shares, totalPaid, overage, isCovered };
 }
+
+export interface OwedLine {
+  personId: string;
+  /** What this person owes the payer (their final share). */
+  amount: number;
+}
+
+export interface PayerFraming {
+  /** Total the payer is owed back by everyone else (they fronted the bill). */
+  collects: number;
+  /** One line per non-payer with the amount they owe the payer. */
+  lines: OwedLine[];
+}
+
+/**
+ * Single-payer settle-up framing (spec §4): the payer fronted the whole bill, so
+ * each other person owes the payer their own final share, and the payer collects
+ * the sum of those. With no payer set, there is nothing to frame.
+ *
+ * Pure: derived entirely from a Settlement; the payer's own share is theirs and
+ * is never "owed".
+ */
+export function whoOwesPayer(
+  settlement: Settlement,
+  payerId: string | null,
+): PayerFraming {
+  if (payerId === null) return { collects: 0, lines: [] };
+
+  const lines: OwedLine[] = settlement.shares
+    .filter((s) => s.personId !== payerId)
+    .map((s) => ({ personId: s.personId, amount: s.final }));
+
+  const collects = roundMoney(lines.reduce((sum, l) => sum + l.amount, 0));
+  return { collects, lines };
+}

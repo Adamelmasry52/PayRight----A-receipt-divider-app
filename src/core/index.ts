@@ -20,9 +20,12 @@ export {
   isFullyAssigned,
   computeRawShares,
   settleUp,
+  whoOwesPayer,
   type PersonShare,
   type Settlement,
   type SettleOptions,
+  type OwedLine,
+  type PayerFraming,
 } from "./split.ts";
 
 export { ceilMoney, roundMoney, approxEqual, MONEY_EPSILON } from "./rounding.ts";

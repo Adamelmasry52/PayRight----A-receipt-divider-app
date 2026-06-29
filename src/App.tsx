@@ -5,6 +5,7 @@ import { ReviewScreen } from "./features/review/ReviewScreen.tsx";
 import { PeopleScreen } from "./features/people/PeopleScreen.tsx";
 import { AssignScreen } from "./features/assign/AssignScreen.tsx";
 import { SummaryScreen } from "./features/summary/SummaryScreen.tsx";
+import { ShareScreen } from "./features/share/ShareScreen.tsx";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
             { path: "/people", element: <PeopleScreen /> },
             { path: "/assign", element: <AssignScreen /> },
             { path: "/summary", element: <SummaryScreen /> },
+            { path: "/share", element: <ShareScreen /> },
             { path: "*", element: <StartScreen /> },
           ]}
         />
