@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="14" fill="oklch(0.225 0.018 245)" />
+  <path
+    d="M20 12h24a2 2 0 0 1 2 2v36l-5-3-5 3-5-3-5 3-5-3-5 3V14a2 2 0 0 1 2-2z"
+    fill="oklch(0.97 0.008 245)"
+  />
+  <rect x="24" y="22" width="16" height="3.5" rx="1.75" fill="oklch(0.6 0.02 245)" />
+  <rect x="24" y="30" width="16" height="3.5" rx="1.75" fill="oklch(0.6 0.02 245)" />
+  <circle cx="44" cy="44" r="13" fill="oklch(0.76 0.16 155)" />
+  <path
+    d="M38.5 44.5l3.5 3.5 6.5-7"
+    fill="none"
+    stroke="oklch(0.185 0.018 245)"
+    stroke-width="3.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

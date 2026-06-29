@@ -1,0 +1,29 @@
+// Public surface of the core math engine. UI imports from "@/core" (or "../core").
+export type {
+  SplitMode,
+  Item,
+  Person,
+  Assignment,
+  Bill,
+} from "./types.ts";
+
+export {
+  SplitError,
+  type SplitErrorCode,
+  lineTotal,
+  computeSubtotal,
+  upliftFactor,
+  assignmentsByItem,
+  itemFractions,
+  validateItemFractions,
+  findUnassignedItems,
+  isFullyAssigned,
+  computeRawShares,
+  settleUp,
+  type PersonShare,
+  type Settlement,
+  type SettleOptions,
+} from "./split.ts";
+
+export { ceilMoney, roundMoney, approxEqual, MONEY_EPSILON } from "./rounding.ts";
+export { normalizeDigits, parseMoney } from "./parse.ts";

@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/*
+  PayRight design system — single source of truth for tokens.
+  Canonical reference: design/PayRight Screens.html + the "Design system"
+  section of CLAUDE.md. Do NOT hardcode colors in components — consume these.
+
+  Tailwind v4 maps these @theme variables to utilities automatically:
+    --color-*  -> bg-*, text-*, border-*, fill-*  (e.g. bg-surface-1)
+    --font-*   -> font-*                          (e.g. font-display)
+    --radius-* -> rounded-*                        (e.g. rounded-card)
+*/
+@theme {
+  /* ---- Surfaces (dark, layered navy-slate, hue ~245, OKLCH) ---- */
+  --color-surface-0: oklch(0.185 0.018 245); /* app background */
+  --color-surface-1: oklch(0.225 0.018 245); /* card */
+  --color-surface-2: oklch(0.26 0.022 245); /* raised */
+
+  /* ---- Text ---- */
+  --color-text: oklch(0.97 0.008 245);
+  --color-text-secondary: oklch(0.74 0.02 245);
+  --color-text-muted: oklch(0.6 0.02 245);
+
+  /* ---- Status: covered / underpaid (drives the green/red check) ---- */
+  --color-success: oklch(0.76 0.16 155);
+  --color-success-text: oklch(0.84 0.16 158);
+  --color-danger: oklch(0.7 0.16 25);
+
+  /* ---- Accent palette (people / avatars) — 6 hues, no repeats per bill ---- */
+  --color-accent-orange: oklch(0.7 0.13 40);
+  --color-accent-blue: oklch(0.7 0.12 235);
+  --color-accent-green: oklch(0.76 0.16 155);
+  --color-accent-teal: oklch(0.74 0.12 200);
+  --color-accent-gold: oklch(0.75 0.12 90);
+  --color-accent-purple: oklch(0.68 0.13 300);
+
+  /* ---- Typography ---- */
+  --font-display: "Fredoka", ui-rounded, "Segoe UI", system-ui, sans-serif;
+  --font-body: "Nunito", ui-sans-serif, system-ui, sans-serif;
+
+  /* ---- Shape language (rounded) ---- */
+  --radius-sm: 6px;
+  --radius-md: 14px;
+  --radius-card: 18px;
+  --radius-pill: 42px;
+}
+
+/*
+  The 6 accent hues as an ordered, indexable list for deterministic
+  per-person assignment (Step 4). Kept here so the palette has one home.
+*/
+:root {
+  --accent-0: var(--color-accent-orange);
+  --accent-1: var(--color-accent-blue);
+  --accent-2: var(--color-accent-green);
+  --accent-3: var(--color-accent-teal);
+  --accent-4: var(--color-accent-gold);
+  --accent-5: var(--color-accent-purple);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    /* Respect iOS safe areas; the app is full-bleed mobile-first. */
+    background-color: var(--color-surface-0);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--color-surface-0);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* Money figures use the display face + tabular numerals for alignment. */
+  .tabular {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  button {
+    font-family: inherit;
+  }
+}
