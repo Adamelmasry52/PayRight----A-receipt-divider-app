@@ -1,0 +1,7 @@
+# SPA fallback for client-side (History API) routes like /review, /summary.
+# Precedence on Cloudflare Pages: Functions (/api/*) → static assets → _redirects.
+# So /api/scan hits the Pages Function and /assets/* are served as static files;
+# only unknown paths fall through to index.html.
+# (Share links use the URL #fragment, which never reaches the server — they load
+#  index.html via this rule and decode client-side.)
+/*    /index.html   200
