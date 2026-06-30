@@ -1,32 +1,36 @@
 /*
-  OCR pipeline orchestrator. Two read engines behind VITE_OCR_ENGINE, both
-  fed by the SAME intake normalization and both producing a ParsedReceipt that
-  flows into loadDraft → review:
+  OCR pipeline orchestrator. Two read engines behind VITE_OCR_ENGINE, both fed by
+  the SAME intake normalization and both producing a ParsedReceipt that flows into
+  loadDraft → review:
 
-    - "vision" (DEV default): Groq vision LLM via the server-side /api/scan.
-    - "paddle": on-device PP-OCRv5 + heuristic parser (production direction).
+    - "vision" (DEV default + production): Groq vision LLM via /api/scan.
+    - "paddle": on-device PP-OCRv5 + heuristic parser (planned production path).
 
-  In dev we can run BOTH on one image (compare) for an honest side-by-side of
-  read quality, since the manual review screen is identical for either.
+  The Paddle engine and its heavy WASM/OpenCV deps are reached ONLY via a dynamic
+  import() guarded by the build-time constant PADDLE_AVAILABLE. In a vision
+  production build that folds to `false`, so the whole Paddle subgraph is
+  tree-shaken out of dist (keeping every asset well under the 25 MiB host limit).
+  In dev (either engine) and in a paddle build, it stays available.
 */
 
-import { parseReceiptLines, type ParsedReceipt } from "../core/index.ts";
-import { canvasToImageData, normalizeImageFile } from "./intake.ts";
-import { preprocess, DEFAULT_PREPROCESS, type PreprocessOptions } from "./preprocess.ts";
-import { initOcr, recognizeLines } from "./paddle.ts";
+import type { ParsedReceipt } from "../core/index.ts";
+import { normalizeImageFile } from "./intake.ts";
+import type { PreprocessOptions } from "./preprocess.ts";
 import { readWithVision } from "./vision.ts";
 
 export type OcrEngine = "vision" | "paddle";
 
 export const ACTIVE_ENGINE: OcrEngine =
-  (import.meta.env.VITE_OCR_ENGINE as OcrEngine) === "paddle" ? "paddle" : "vision";
+  import.meta.env.VITE_OCR_ENGINE === "paddle" ? "paddle" : "vision";
 
-export type OcrStage =
-  | "normalizing"
-  | "reading"
-  | "parsing";
+// Build-time gate. Reachable only in dev, or in a build explicitly made with
+// VITE_OCR_ENGINE=paddle. Folds to a literal `false` in a vision prod build so
+// the dynamic import("./paddleRun.ts") below becomes dead code.
+const PADDLE_AVAILABLE =
+  import.meta.env.DEV || import.meta.env.VITE_OCR_ENGINE === "paddle";
 
-/** Result of running one engine (for the primary read and the comparison dump). */
+export type OcrStage = "normalizing" | "reading" | "parsing";
+
 export interface EngineRun {
   engine: OcrEngine;
   draft?: ParsedReceipt;
@@ -71,14 +75,13 @@ async function runVision(blob: Blob): Promise<EngineRun> {
 
 async function runPaddle(
   canvas: HTMLCanvasElement,
-  preOpts: PreprocessOptions,
+  preOpts: PreprocessOptions | undefined,
 ): Promise<EngineRun> {
   const t = performance.now();
   try {
-    const processed = await preprocess(canvas, preOpts);
-    const service = await initOcr();
-    const lines = await recognizeLines(service, canvasToImageData(processed));
-    const draft = parseReceiptLines(lines);
+    // Dynamic import gated by PADDLE_AVAILABLE at every call site below.
+    const { runPaddleEngine } = await import("./paddleRun.ts");
+    const { draft, lines } = await runPaddleEngine(canvas, preOpts);
     return { engine: "paddle", draft, lines, ms: Math.round(performance.now() - t) };
   } catch (e) {
     return {
@@ -96,7 +99,6 @@ export async function runOcrPipeline(
   const onStage = options.onStage ?? (() => {});
   const engine = options.engine ?? ACTIVE_ENGINE;
   const compare = options.compare ?? import.meta.env.DEV;
-  const preOpts = options.preprocess ?? DEFAULT_PREPROCESS;
   const start = performance.now();
 
   onStage("normalizing");
@@ -107,26 +109,33 @@ export async function runOcrPipeline(
   onStage("reading");
   const comparison: Partial<Record<OcrEngine, EngineRun>> = {};
 
-  if (compare) {
-    // Run both for a fair side-by-side. Primary first (so its stage feels live),
-    // then the other.
-    const primaryRun = engine === "vision" ? await runVision(blob) : await runPaddle(canvas, preOpts);
-    comparison[engine] = primaryRun;
-    const otherEngine: OcrEngine = engine === "vision" ? "paddle" : "vision";
-    comparison[otherEngine] =
-      otherEngine === "vision" ? await runVision(blob) : await runPaddle(canvas, preOpts);
+  if (engine === "paddle") {
+    // `PADDLE_AVAILABLE` is a build constant — when false this branch's import is
+    // dead and tree-shaken; the engine is simply unavailable in that build.
+    if (PADDLE_AVAILABLE) {
+      comparison.paddle = await runPaddle(canvas, options.preprocess);
+    } else {
+      comparison.paddle = {
+        engine: "paddle",
+        ms: 0,
+        error: "On-device OCR isn't included in this build.",
+      };
+    }
+    if (compare) comparison.vision = await runVision(blob);
   } else {
-    comparison[engine] =
-      engine === "vision" ? await runVision(blob) : await runPaddle(canvas, preOpts);
+    comparison.vision = await runVision(blob);
+    if (compare && PADDLE_AVAILABLE) {
+      comparison.paddle = await runPaddle(canvas, options.preprocess);
+    }
   }
 
   onStage("parsing");
-  const primary = comparison[engine]!;
+  const primary = comparison[engine];
 
   return {
     engine,
-    draft: primary.draft ?? null,
-    primaryError: primary.error,
+    draft: primary?.draft ?? null,
+    primaryError: primary?.error,
     intakeMs,
     totalMs: Math.round(performance.now() - start),
     comparison,
