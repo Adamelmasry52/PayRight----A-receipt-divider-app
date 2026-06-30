@@ -1,6 +1,7 @@
 import { RouterProvider, Routes } from "./router.tsx";
 import { BillProvider } from "./context/BillContext.tsx";
 import { StartScreen } from "./features/start/StartScreen.tsx";
+import { CaptureScreen } from "./features/capture/CaptureScreen.tsx";
 import { ReviewScreen } from "./features/review/ReviewScreen.tsx";
 import { PeopleScreen } from "./features/people/PeopleScreen.tsx";
 import { AssignScreen } from "./features/assign/AssignScreen.tsx";
@@ -14,6 +15,7 @@ export default function App() {
         <Routes
           routes={[
             { path: "/", element: <StartScreen /> },
+            { path: "/capture", element: <CaptureScreen /> },
             { path: "/review", element: <ReviewScreen /> },
             { path: "/people", element: <PeopleScreen /> },
             { path: "/assign", element: <AssignScreen /> },

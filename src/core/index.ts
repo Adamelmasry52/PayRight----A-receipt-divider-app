@@ -30,6 +30,7 @@ export {
 
 export { ceilMoney, roundMoney, approxEqual, MONEY_EPSILON } from "./rounding.ts";
 export { normalizeDigits, parseMoney } from "./parse.ts";
+export { parseReceiptLines, type ParsedReceipt } from "./receiptParse.ts";
 
 export {
   validateBillDraft,

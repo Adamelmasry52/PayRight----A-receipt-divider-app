@@ -33,15 +33,11 @@ export function StartScreen() {
 
           <Button
             variant="secondary"
-            disabled
             className="w-full"
-            title="Coming in a later step"
+            onClick={() => navigate("/capture")}
           >
             <Camera weight="fill" size={20} />
             Scan receipt
-            <span className="ml-1 rounded-pill bg-white/10 px-2 py-0.5 text-xs font-semibold text-text-muted">
-              soon
-            </span>
           </Button>
         </div>
       </div>
