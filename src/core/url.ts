@@ -22,6 +22,13 @@ import type { Assignment, Bill, Item, Person, SplitMode } from "./types.ts";
 export const SHARE_SCHEMA_VERSION = 1;
 export const SHARE_FRAGMENT_PREFIX = "d=";
 
+/**
+ * Hard cap on the compressed fragment length before we attempt to decompress.
+ * A legitimate large bill (30 items × 8 people) is well under 1k chars; this
+ * guards against a hostile multi-MB fragment wasting the victim's CPU.
+ */
+export const MAX_FRAGMENT_CHARS = 100_000;
+
 const MODE_CODES: Record<SplitMode, number> = {
   whole: 0,
   equal: 1,
@@ -96,7 +103,7 @@ export function decodeBillPayload(fragment: string): DecodedBill | null {
     if (raw.startsWith(SHARE_FRAGMENT_PREFIX)) {
       raw = raw.slice(SHARE_FRAGMENT_PREFIX.length);
     }
-    if (!raw) return null;
+    if (!raw || raw.length > MAX_FRAGMENT_CHARS) return null;
 
     const json = decompressFromEncodedURIComponent(raw);
     if (!json) return null;

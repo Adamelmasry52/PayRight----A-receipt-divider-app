@@ -38,6 +38,7 @@ export {
   type DecodedBill,
   SHARE_SCHEMA_VERSION,
   SHARE_FRAGMENT_PREFIX,
+  MAX_FRAGMENT_CHARS,
 } from "./url.ts";
 
 export {

@@ -110,7 +110,7 @@ export function CaptureScreen() {
       <h1 className="text-2xl">Scan a receipt</h1>
       <p className="mt-1 text-sm text-text-secondary">
         {ACTIVE_ENGINE === "vision"
-          ? "Photograph the receipt or pick a photo. The image is sent to a cloud vision model to read it (dev mode) and isn't stored."
+          ? "Photograph the receipt or pick a photo to read it automatically."
           : "Photograph the receipt or pick a photo. It's read on your phone — the image never leaves your device."}
       </p>
 
@@ -205,6 +205,13 @@ export function CaptureScreen() {
           Choose from photos
         </Button>
       </div>
+
+      {ACTIVE_ENGINE === "vision" && (
+        <p className="mt-4 text-center text-xs text-text-muted">
+          To read it, the photo is sent to Groq (a third-party vision service).
+          It isn't stored.
+        </p>
+      )}
     </AppShell>
   );
 }
