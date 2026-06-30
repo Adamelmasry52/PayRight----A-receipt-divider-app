@@ -1,13 +1,16 @@
 /*
   Receipt text → structured draft (spec §3.4). Pure and React-free.
 
-  This is deliberately PRAGMATIC: OCR output is noisy, and the manual review
-  screen (Step 3) is the safety net. The parser only pre-fills it. Heuristics:
-    - normalize Arabic-Indic digits first (numbers may be ٠-٩)
-    - a line whose trailing token is a money amount = an item (name + price)
-    - keyword lines set subtotal / total
-    - service / VAT / tax / payment lines are skipped (the uplift factor already
-      distributes tax+service from the printed total — we never parse rates)
+  The model here is LABELED FIELDS vs ITEMS:
+    - Subtotal / Total / Service / VAT-Tax lines are recognized labels and are
+      NEVER items — they populate their own fields.
+    - Items are the genuine name+price lines left after labels (and payment/
+      contact rows) are removed.
+
+  Matching is case- and whitespace-insensitive (so "MwSt" or a space-stripped
+  "MwStNr" still matches) and covers Arabic equivalents. Numbers are normalized
+  from Arabic-Indic digits first. Deliberately pragmatic — the manual review
+  screen is the safety net; we do NOT chase per-receipt formatting noise.
 */
 
 import type { Item } from "./types.ts";
@@ -16,16 +19,60 @@ import { roundMoney } from "./rounding.ts";
 
 export interface ParsedReceipt {
   items: Item[];
-  subtotal: number; // 0 when not confidently found (review derives it)
-  total: number; // 0 when not found
+  /** Labeled fields (0 when not found). subtotal/total feed the bill; */
+  subtotal: number;
+  total: number;
+  /** service & tax are surfaced for transparency/debugging, not for the math. */
+  service: number;
+  tax: number;
 }
 
-const SUBTOTAL_RE = /\bsub[\s-]*total\b/i;
-const TOTAL_RE = /\b(grand[\s-]*total|total[\s-]*due|amount[\s-]*due|net[\s-]*total|total)\b/i;
-// Lines that are charges, taxes, payment or contact rows — never items, and not
-// the grand total. Includes common non-English VAT names (mwst/btw/tva/iva/ust).
-const SKIP_RE =
-  /\b(service|s\.?\s*charge|svc|vat|tax|mwst|btw|tva|iva|ust|gratuity|tip|discount|change|cash|visa|master|card|balance|round(ing)?|delivery|tel|fax|phone)\b/i;
+type LabelField = "subtotal" | "total" | "service" | "tax";
+
+/*
+  Keyword sets in space-stripped, lower-cased form. Checked in priority order so
+  "subtotal" wins over "total" (which is a substring of it). Arabic terms are
+  included with their common hamza variants.
+*/
+const LABEL_KEYWORDS: Record<LabelField, string[]> = {
+  subtotal: ["subtotal", "الفرعي", "المجموعالفرعي"],
+  service: ["servicecharge", "service", "svc", "خدمة", "الخدمة"],
+  tax: ["vat", "mwst", "tva", "btw", "iva", "gst", "ust", "tax", "ضريبة", "الضريبة"],
+  total: [
+    "grandtotal",
+    "totaldue",
+    "amountdue",
+    "nettotal",
+    "total",
+    "الاجمالي",
+    "الإجمالي",
+    "إجمالي",
+    "اجمالي",
+    "المجموع",
+    "الاجمالى",
+  ],
+};
+const LABEL_ORDER: LabelField[] = ["subtotal", "service", "tax", "total"];
+
+// Payment / change / contact rows — not labels, not items.
+const PAYMENT_KEYWORDS = [
+  "cash",
+  "change",
+  "visa",
+  "mastercard",
+  "balance",
+  "rounding",
+  "delivery",
+  "tel",
+  "fax",
+  "phone",
+  "نقدي",
+  "الباقي",
+  "مدفوع",
+  "فيزا",
+  "هاتف",
+];
+
 // Time (12:30) or date (12/06/2026) lines — the trailing number isn't a price.
 const DATETIME_RE = /\b\d{1,2}:\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/;
 
@@ -33,6 +80,18 @@ let idSeq = 0;
 function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `item-${idSeq++}-${Math.random().toString(36).slice(2)}`;
+}
+
+/** Lower-case and strip all whitespace, for whitespace-insensitive matching. */
+function squash(line: string): string {
+  return line.toLowerCase().replace(/\s+/g, "");
+}
+
+function classifyLabel(squashed: string): LabelField | null {
+  for (const field of LABEL_ORDER) {
+    if (LABEL_KEYWORDS[field].some((kw) => squashed.includes(kw))) return field;
+  }
+  return null;
 }
 
 interface TrailingAmount {
@@ -78,8 +137,12 @@ function buildItem(ta: TrailingAmount): Item {
  */
 export function parseReceiptLines(lines: string[]): ParsedReceipt {
   const items: Item[] = [];
-  let subtotal = 0;
-  let total = 0;
+  const fields: Record<LabelField, number> = {
+    subtotal: 0,
+    total: 0,
+    service: 0,
+    tax: 0,
+  };
 
   for (const raw of lines) {
     const line = normalizeDigits(raw).trim();
@@ -87,23 +150,22 @@ export function parseReceiptLines(lines: string[]): ParsedReceipt {
     if (DATETIME_RE.test(line)) continue;
     if (line.includes("@")) continue; // email / handle lines
 
+    const squashed = squash(line);
     const ta = extractTrailingAmount(line);
 
-    // Subtotal must be checked before the broader total match.
-    if (SUBTOTAL_RE.test(line)) {
-      if (ta) subtotal = ta.amount;
+    // Labeled charge/total field: classified, never an item (even without an amount).
+    const label = classifyLabel(squashed);
+    if (label) {
+      if (ta) fields[label] = ta.amount;
       continue;
     }
-    if (TOTAL_RE.test(line)) {
-      if (ta) total = ta.amount;
-      continue;
-    }
-    if (SKIP_RE.test(line)) continue;
+
+    if (PAYMENT_KEYWORDS.some((kw) => squashed.includes(kw))) continue;
 
     // An item needs both a name and a price.
     if (!ta || ta.name === "" || ta.amount <= 0) continue;
     items.push(buildItem(ta));
   }
 
-  return { items, subtotal, total };
+  return { items, ...fields };
 }

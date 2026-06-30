@@ -41,13 +41,34 @@ export function CaptureScreen() {
       const { runOcrPipeline } = await import("../../ocr/pipeline.ts");
       const outcome = await runOcrPipeline(file, { onStage: setStage });
 
-      // Surfaced for the browser-OCR assessment.
-      console.info("[PayRight OCR] timings(ms):", outcome.timings);
-      console.info("[PayRight OCR] lines:", outcome.lines);
-      console.info("[PayRight OCR] parsed:", outcome.draft);
+      // ---- Per-scan dump for assessing OCR + classification on real receipts ----
+      const { draft, lines, timings } = outcome;
+      const classified = {
+        items: draft.items.map((i) => ({
+          name: i.name,
+          qty: i.qty,
+          unitPrice: i.unitPrice,
+        })),
+        subtotal: draft.subtotal,
+        total: draft.total,
+        service: draft.service,
+        tax: draft.tax,
+      };
+      console.groupCollapsed("%c[PayRight OCR] scan result", "font-weight:bold");
+      console.log("timings(ms):", timings);
+      console.log(`raw OCR lines (${lines.length}):\n` + lines.join("\n"));
+      console.log("classified:", JSON.stringify(classified, null, 2));
+      console.table(classified.items);
+      console.groupEnd();
+      // Also exposed for quick inspection: window.__payrightOcr
+      (window as unknown as { __payrightOcr?: unknown }).__payrightOcr = {
+        lines,
+        classified,
+        timings,
+      };
 
       reset();
-      loadDraft(outcome.draft);
+      loadDraft(draft);
       navigate("/review");
     } catch (e) {
       console.error("[PayRight OCR] failed:", e);

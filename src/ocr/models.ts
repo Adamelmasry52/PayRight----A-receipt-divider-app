@@ -45,7 +45,12 @@ export async function loadOcrModels(): Promise<OcrModels> {
     cachedFetch(`${MODEL_BASE}/${FILES.dict}`).then((r) => r.text()),
   ]);
 
-  // Dictionary is one character per line; keep order (indices map to CTC labels).
+  // Dictionary is one character per line; index 0 is the CTC blank and order
+  // maps to the model's label indices. The file omits the space character that
+  // PP-OCRv5 was trained with (use_space_char), so its final label index has no
+  // entry and intra-region spaces get dropped ("2xLatteMacchiato"). Append the
+  // space so the recognizer can emit word gaps.
   const dictionary = dictText.replace(/\n$/, "").split("\n");
+  dictionary.push(" ");
   return { detBuffer, recBuffer, dictionary };
 }

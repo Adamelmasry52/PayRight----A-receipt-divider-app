@@ -51,9 +51,17 @@ export async function recognizeLines(
     ),
   });
 
-  // Group the reading-order results into lines and join each line's text.
+  // Group the reading-order results into lines, then join each line's regions
+  // with a single space (preserving word gaps between detected boxes) and
+  // collapse any runs of whitespace.
   const grouped = service.processRecognition(results);
   return grouped.lines
-    .map((line) => line.map((r) => r.text).join(" ").trim())
+    .map((line) =>
+      line
+        .map((r) => r.text)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
     .filter((s) => s.length > 0);
 }
