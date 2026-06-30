@@ -2,14 +2,20 @@ import { useMemo, useState } from "react";
 import {
   ArrowCounterClockwise,
   ArrowLeft,
-  ArrowRight,
   Check,
   CheckCircle,
+  Copy,
   PencilSimple,
+  ShareNetwork,
   XCircle,
 } from "@phosphor-icons/react";
 import type { Person, Settlement } from "../../core/index.ts";
-import { isFullyAssigned, settleUp, whoOwesPayer } from "../../core/index.ts";
+import {
+  encodeBillPayload,
+  isFullyAssigned,
+  settleUp,
+  whoOwesPayer,
+} from "../../core/index.ts";
 import { useBill } from "../../context/BillContext.tsx";
 import { useRouter } from "../../router.tsx";
 import { AppShell } from "../../components/AppShell.tsx";
@@ -25,6 +31,10 @@ export function SummaryScreen() {
 
   const [overrides, setOverrides] = useState<Record<string, number>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState<string>("");
+  const [shareState, setShareState] = useState<"idle" | "shared" | "copied" | "error">(
+    "idle",
+  );
 
   const ready = bill.items.length > 0 && isFullyAssigned(bill);
 
@@ -60,6 +70,30 @@ export function SummaryScreen() {
   const shortfall = Math.round((settlement.total - settlement.totalPaid) * 100) / 100;
   const upliftAmount = Math.round((settlement.total - settlement.subtotal) * 100) / 100;
 
+  const handleShare = async () => {
+    const url = `${window.location.origin}${window.location.pathname}#${encodeBillPayload(
+      bill,
+      overrides,
+    )}`;
+    setShareUrl(url);
+    // Prefer the native share sheet; fall back to clipboard.
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "PayRight — our split", url });
+        setShareState("shared");
+        return;
+      } catch {
+        /* user dismissed the sheet — fall through to clipboard */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareState("copied");
+    } catch {
+      setShareState("error");
+    }
+  };
+
   const setOverride = (id: string, value: number) =>
     setOverrides((o) => ({ ...o, [id]: value }));
   const resetOne = (id: string) =>
@@ -72,9 +106,11 @@ export function SummaryScreen() {
   return (
     <AppShell
       footer={
-        <Button variant="primary" className="w-full" onClick={() => navigate("/share")}>
-          Share this split
-          <ArrowRight weight="bold" size={20} />
+        <Button variant="primary" className="w-full" onClick={handleShare}>
+          <ShareNetwork weight="fill" size={20} />
+          {shareState === "copied" || shareState === "shared"
+            ? "Link ready — share again"
+            : "Share this split"}
         </Button>
       }
     >
@@ -192,6 +228,47 @@ export function SummaryScreen() {
         <div className="my-2 h-px bg-white/5" />
         <Row label="Total" value={`${money(settlement.total)} EGP`} />
       </section>
+
+      {/* Generated share link */}
+      {shareUrl && (
+        <section className="mt-4 rounded-card bg-surface-1 p-4">
+          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-success-text">
+            <CheckCircle weight="fill" size={16} />
+            {shareState === "shared"
+              ? "Shared"
+              : shareState === "copied"
+                ? "Link copied"
+                : shareState === "error"
+                  ? "Couldn't copy — long-press to copy below"
+                  : "Link ready"}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={shareUrl}
+              aria-label="Shareable link"
+              onFocus={(e) => e.currentTarget.select()}
+              className="tabular min-h-[40px] flex-1 truncate rounded-md bg-surface-2 px-3 text-xs text-text-secondary outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(shareUrl)
+                  .then(() => setShareState("copied"))
+                  .catch(() => setShareState("error"));
+              }}
+              aria-label="Copy link"
+              className="grid size-10 shrink-0 place-items-center rounded-md bg-surface-2 text-text-secondary hover:text-text"
+            >
+              <Copy weight="bold" size={18} />
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-text-muted">
+            Anyone with this link sees a read-only copy of this split.
+          </p>
+        </section>
+      )}
     </AppShell>
   );
 }

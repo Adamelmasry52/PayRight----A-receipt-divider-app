@@ -33,6 +33,14 @@ export { normalizeDigits, parseMoney } from "./parse.ts";
 export { parseReceiptLines, type ParsedReceipt } from "./receiptParse.ts";
 
 export {
+  encodeBillPayload,
+  decodeBillPayload,
+  type DecodedBill,
+  SHARE_SCHEMA_VERSION,
+  SHARE_FRAGMENT_PREFIX,
+} from "./url.ts";
+
+export {
   validateBillDraft,
   type BillDraftInput,
   type BillDraftValidation,
