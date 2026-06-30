@@ -22,6 +22,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Env / secrets (server-side keys must never be committed)
+.env
+.env.*
+!.env.example
+
 # Vitest / TS build cache
 coverage
 .tmp

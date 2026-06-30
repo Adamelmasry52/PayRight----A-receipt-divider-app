@@ -3,12 +3,15 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { groqScanPlugin } from "./vite-plugins/groqScan.ts";
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // Dev-only /api/scan endpoint for the Groq vision read path (key stays server-side).
+    groqScanPlugin(),
     VitePWA({
       registerType: "autoUpdate",
       // Full manifest + generated icons land in Step 8. This is the offline

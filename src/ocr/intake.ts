@@ -35,13 +35,26 @@ function blobToImage(blob: Blob): Promise<HTMLImageElement> {
 export interface IntakeOptions {
   /** Longest side after downscale (px). */
   maxDimension?: number;
+  /** Max size of the compressed blob (MB). Kept under Groq's ~4MB base64 cap. */
+  maxSizeMB?: number;
 }
 
-/** Convert any accepted image file into a normalized RGBA canvas. */
+export interface NormalizedImage {
+  /** RGBA canvas for the on-device (PP-OCR) path. */
+  canvas: HTMLCanvasElement;
+  /** Compressed JPEG blob for the vision-upload path (base64-encoded by caller). */
+  blob: Blob;
+}
+
+/**
+ * Convert any accepted image file into a normalized canvas + compressed JPEG
+ * blob. HEIC→JPEG and downscale/compress happen here, by file type, BEFORE
+ * either read engine — required so the vision upload stays under the size cap.
+ */
 export async function normalizeImageFile(
   file: File,
   options: IntakeOptions = {},
-): Promise<HTMLCanvasElement> {
+): Promise<NormalizedImage> {
   let blob: Blob = file;
 
   if (isHeic(file)) {
@@ -58,7 +71,7 @@ export async function normalizeImageFile(
     new File([blob], "receipt.jpg", { type: blob.type || "image/jpeg" }),
     {
       maxWidthOrHeight: options.maxDimension ?? 1600,
-      maxSizeMB: 3,
+      maxSizeMB: options.maxSizeMB ?? 2,
       useWebWorker: true,
       initialQuality: 0.9,
     },
@@ -71,7 +84,7 @@ export async function normalizeImageFile(
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D context unavailable.");
   ctx.drawImage(img, 0, 0);
-  return canvas;
+  return { canvas, blob: compressed };
 }
 
 /** Read a canvas as ImageData (RGBA) for the OCR engine. */

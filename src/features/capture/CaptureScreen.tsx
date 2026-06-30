@@ -10,13 +10,12 @@ import { useBill } from "../../context/BillContext.tsx";
 import { useRouter } from "../../router.tsx";
 import { AppShell } from "../../components/AppShell.tsx";
 import { Button } from "../../components/ui/Button.tsx";
-import type { OcrStage } from "../../ocr/pipeline.ts";
+import { ACTIVE_ENGINE, type OcrStage } from "../../ocr/pipeline.ts";
 
 const STAGE_TEXT: Record<OcrStage, string> = {
   normalizing: "Preparing the photo…",
-  preprocessing: "Cleaning up the image…",
-  "loading-model": "Loading the OCR model (first scan only)…",
-  reading: "Reading the receipt…",
+  reading:
+    ACTIVE_ENGINE === "vision" ? "Reading the receipt…" : "Reading the receipt on-device…",
   parsing: "Finding items and totals…",
 };
 
@@ -41,34 +40,52 @@ export function CaptureScreen() {
       const { runOcrPipeline } = await import("../../ocr/pipeline.ts");
       const outcome = await runOcrPipeline(file, { onStage: setStage });
 
-      // ---- Per-scan dump for assessing OCR + classification on real receipts ----
-      const { draft, lines, timings } = outcome;
-      const classified = {
-        items: draft.items.map((i) => ({
-          name: i.name,
-          qty: i.qty,
-          unitPrice: i.unitPrice,
-        })),
-        subtotal: draft.subtotal,
-        total: draft.total,
-        service: draft.service,
-        tax: draft.tax,
-      };
-      console.groupCollapsed("%c[PayRight OCR] scan result", "font-weight:bold");
-      console.log("timings(ms):", timings);
-      console.log(`raw OCR lines (${lines.length}):\n` + lines.join("\n"));
-      console.log("classified:", JSON.stringify(classified, null, 2));
-      console.table(classified.items);
+      // ---- Side-by-side dump for comparing read quality per receipt ----
+      const summarize = (r?: {
+        draft?: { items: unknown[]; subtotal: number; total: number; service: number; tax: number };
+        lines?: string[];
+        ms: number;
+        error?: string;
+      }) =>
+        r
+          ? { ms: r.ms, error: r.error, lines: r.lines, draft: r.draft }
+          : undefined;
+
+      console.groupCollapsed(
+        `%c[PayRight scan] engine=${outcome.engine} (${outcome.totalMs}ms)`,
+        "font-weight:bold",
+      );
+      console.log("intakeMs:", outcome.intakeMs, "totalMs:", outcome.totalMs);
+      const vision = outcome.comparison.vision;
+      const paddle = outcome.comparison.paddle;
+      if (vision) {
+        console.group("%cGroq vision", "color:#6cf");
+        console.log("ms:", vision.ms, vision.error ? `ERROR: ${vision.error}` : "");
+        if (vision.draft) console.log(JSON.stringify(vision.draft, null, 2));
+        console.groupEnd();
+      }
+      if (paddle) {
+        console.group("%cPP-OCR (paddle)", "color:#fc6");
+        console.log("ms:", paddle.ms, paddle.error ? `ERROR: ${paddle.error}` : "");
+        if (paddle.lines) console.log(`raw lines (${paddle.lines.length}):\n` + paddle.lines.join("\n"));
+        if (paddle.draft) console.log(JSON.stringify(paddle.draft, null, 2));
+        console.groupEnd();
+      }
       console.groupEnd();
-      // Also exposed for quick inspection: window.__payrightOcr
-      (window as unknown as { __payrightOcr?: unknown }).__payrightOcr = {
-        lines,
-        classified,
-        timings,
+      (window as unknown as { __payrightScan?: unknown }).__payrightScan = {
+        engine: outcome.engine,
+        intakeMs: outcome.intakeMs,
+        totalMs: outcome.totalMs,
+        vision: summarize(vision),
+        paddle: summarize(paddle),
       };
 
+      if (!outcome.draft) {
+        throw new Error(outcome.primaryError ?? "Could not read the receipt.");
+      }
+
       reset();
-      loadDraft(draft);
+      loadDraft(outcome.draft);
       navigate("/review");
     } catch (e) {
       console.error("[PayRight OCR] failed:", e);
@@ -92,8 +109,9 @@ export function CaptureScreen() {
 
       <h1 className="text-2xl">Scan a receipt</h1>
       <p className="mt-1 text-sm text-text-secondary">
-        Photograph the receipt or pick a photo. It's read on your phone — nothing
-        is uploaded.
+        {ACTIVE_ENGINE === "vision"
+          ? "Photograph the receipt or pick a photo. The image is sent to a cloud vision model to read it (dev mode) and isn't stored."
+          : "Photograph the receipt or pick a photo. It's read on your phone — the image never leaves your device."}
       </p>
 
       {/* Framing guide */}
@@ -108,9 +126,11 @@ export function CaptureScreen() {
                 className="mx-auto mb-3 animate-spin text-success"
               />
               <p className="text-sm font-semibold text-text">{STAGE_TEXT[stage]}</p>
-              <p className="mt-1 text-xs text-text-muted">
-                The model is cached after the first scan.
-              </p>
+              {ACTIVE_ENGINE === "paddle" && (
+                <p className="mt-1 text-xs text-text-muted">
+                  The model is cached after the first scan.
+                </p>
+              )}
             </div>
           </div>
         ) : (
