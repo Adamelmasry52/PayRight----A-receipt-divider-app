@@ -66,9 +66,9 @@ export default defineConfig(({ mode }) => {
       exclude: ["onnxruntime-web"],
     },
     test: {
-      // Core math is pure and DOM-free — run it in Node.
+      // Core math + server helpers are pure and DOM-free — run them in Node.
       environment: "node",
-      include: ["src/**/*.test.ts"],
+      include: ["src/**/*.test.ts", "server/**/*.test.ts"],
     },
   };
 });

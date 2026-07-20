@@ -9,7 +9,8 @@
 */
 
 // ── Sizes ────────────────────────────────────────────────────────────────────
-// ~6M base64 chars ≈ 4.5MB image — also keeps us under Groq's ~4MB image cap.
+// ~6M base64 chars ≈ 4.5MB image — comfortably under qwen3.6-27b's 20MB cap
+// (intake compresses to ≤2MB anyway; this is just an abuse ceiling).
 export const MAX_BASE64_CHARS = 6_000_000;
 // Whole request body (base64 + JSON overhead). Checked via Content-Length first.
 export const MAX_BODY_BYTES = 8_500_000;

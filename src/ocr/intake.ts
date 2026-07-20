@@ -35,7 +35,7 @@ function blobToImage(blob: Blob): Promise<HTMLImageElement> {
 export interface IntakeOptions {
   /** Longest side after downscale (px). */
   maxDimension?: number;
-  /** Max size of the compressed blob (MB). Kept under Groq's ~4MB base64 cap. */
+  /** Max size of the compressed blob (MB). Well under qwen3.6-27b's 20MB cap. */
   maxSizeMB?: number;
 }
 

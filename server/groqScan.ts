@@ -29,18 +29,41 @@ export class GroqError extends Error {
   }
 }
 
-// Preference order for picking a CURRENT vision model from the live list.
-// We do NOT hardcode scout (deprecation-flagged); it's only a last resort.
-const VISION_PRIORITY: RegExp[] = [
-  /maverick/i,
-  /llama-4(?!.*scout)/i,
-  /vision/i,
-  /scout/i,
-];
+/** Groq's current multimodal model (JSON mode, 20MB image cap). */
+export const DEFAULT_VISION_MODEL = "qwen/qwen3.6-27b";
+
+// Best-effort fallback when the default is gone from the live list. NOTE: avoid a
+// broad /qwen/ here — qwen3-32b is text-only; match known multimodal families.
+// The definitive fix for any future deprecation is setting GROQ_MODEL.
+const VISION_PRIORITY: RegExp[] = [/maverick/i, /llama-4/i, /\bvl\b/i, /vision/i, /scout/i];
+
+const MODEL_HELP =
+  "Set GROQ_MODEL to a current Groq vision model (see console.groq.com/docs/models).";
 
 let cachedModel: string | null = null;
 
-/** Select a vision-capable model id from Groq's live models endpoint. */
+/** Test-only: clear the memoized model between cases. */
+export function resetVisionModelCache(): void {
+  cachedModel = null;
+}
+
+async function fetchModelIds(apiKey: string): Promise<string[]> {
+  const res = await fetch(`${GROQ_BASE}/models`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) throw new GroqError(`Groq models list failed (${res.status})`, res.status);
+  const json = (await res.json()) as { data?: { id: string }[] };
+  return (json.data ?? []).map((m) => m.id);
+}
+
+/**
+ * Resolve the vision model. Order of resolution:
+ *   1. GROQ_MODEL override, if provided (no network).
+ *   2. else qwen/qwen3.6-27b — used unless the live models list explicitly no
+ *      longer offers it (a models-endpoint hiccup falls back to it, not an error).
+ *   3. else scan the live /models list for any vision-capable model.
+ *   4. else throw a self-explanatory error naming GROQ_MODEL.
+ */
 export async function selectVisionModel(
   apiKey: string,
   override?: string,
@@ -48,23 +71,24 @@ export async function selectVisionModel(
   if (override) return override;
   if (cachedModel) return cachedModel;
 
-  const res = await fetch(`${GROQ_BASE}/models`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  if (!res.ok) {
-    throw new GroqError(`Groq models list failed (${res.status})`, res.status);
+  let ids: string[];
+  try {
+    ids = await fetchModelIds(apiKey);
+  } catch {
+    // Don't block scans on a models-endpoint hiccup — trust the default.
+    return (cachedModel = DEFAULT_VISION_MODEL);
   }
-  const json = (await res.json()) as { data?: { id: string }[] };
-  const ids = (json.data ?? []).map((m) => m.id);
+
+  if (ids.length === 0 || ids.includes(DEFAULT_VISION_MODEL)) {
+    return (cachedModel = DEFAULT_VISION_MODEL);
+  }
 
   for (const rx of VISION_PRIORITY) {
     const hit = ids.find((id) => rx.test(id));
-    if (hit) {
-      cachedModel = hit;
-      return hit;
-    }
+    if (hit) return (cachedModel = hit);
   }
-  throw new GroqError("No vision-capable Groq model found in the live list.", 502);
+
+  throw new GroqError(`No vision-capable Groq model found. ${MODEL_HELP}`, 502);
 }
 
 const SYSTEM_PROMPT =
@@ -138,6 +162,12 @@ export interface ScanArgs {
 export async function scanReceipt(
   args: ScanArgs,
 ): Promise<{ data: ReceiptJson; warning?: string }> {
+  // qwen3 / gpt-oss are reasoning models: left on, their thinking eats the token
+  // budget and can leave empty content that fails Groq's JSON validation
+  // (json_validate_failed). Turn reasoning OFF so the whole budget goes to the
+  // JSON answer. Only sent to reasoning-family models — other models reject it.
+  const isReasoningModel = /qwen3|gpt-oss|reasoning/i.test(args.model);
+
   const res = await fetch(`${GROQ_BASE}/chat/completions`, {
     method: "POST",
     headers: {
@@ -147,8 +177,9 @@ export async function scanReceipt(
     body: JSON.stringify({
       model: args.model,
       temperature: 0,
-      max_tokens: 2000,
+      max_tokens: 1536,
       response_format: { type: "json_object" },
+      ...(isReasoningModel ? { reasoning_effort: "none" } : {}),
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {

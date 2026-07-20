@@ -22,5 +22,6 @@
     "noUncheckedSideEffectImports": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "vite-plugins/**/*.ts", "server/**/*.ts"]
+  "include": ["vite.config.ts", "vite-plugins/**/*.ts", "server/**/*.ts"],
+  "exclude": ["server/**/*.test.ts", "vite-plugins/**/*.test.ts"]
 }
