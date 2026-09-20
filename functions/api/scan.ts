@@ -11,7 +11,7 @@
   PaddleOCR-VL for production.
 */
 
-import { GroqError, scanReceipt, selectVisionModel } from "../../server/groqScan.ts";
+import { GroqError, scanReceipt } from "../../server/groqScan.ts";
 import {
   checkRateLimit,
   contentLengthTooLarge,
@@ -106,14 +106,13 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
     const v = validateScanInput(body);
     if (!v.ok) return json(v.status ?? 400, { error: v.error }, origin);
 
-    const model = await selectVisionModel(apiKey, env.GROQ_MODEL || undefined);
     const result = await scanReceipt({
       apiKey,
-      model,
+      override: env.GROQ_MODEL || undefined,
       imageBase64: body.imageBase64!,
       mimeType: body.mimeType!,
     });
-    return json(200, { ...result.data, _model: model, _warning: result.warning }, origin);
+    return json(200, { ...result.data, _model: result.model, _warning: result.warning }, origin);
   } catch (e) {
     if (e instanceof GroqError) {
       return json(e.status === 429 ? 429 : 502, { error: e.message, code: e.status }, origin);

@@ -6,7 +6,7 @@
 
 import type { Plugin } from "vite";
 import { loadEnv } from "vite";
-import { GroqError, scanReceipt, selectVisionModel } from "../server/groqScan.ts";
+import { GroqError, scanReceipt } from "../server/groqScan.ts";
 import {
   checkRateLimit,
   corsHeaders,
@@ -111,14 +111,13 @@ export function groqScanPlugin(): Plugin {
                 const v = validateScanInput(parsed);
                 if (!v.ok) return send(v.status ?? 400, { error: v.error });
 
-                const model = await selectVisionModel(apiKey, modelOverride || undefined);
                 const result = await scanReceipt({
                   apiKey,
-                  model,
+                  override: modelOverride || undefined,
                   imageBase64: parsed.imageBase64,
                   mimeType: parsed.mimeType,
                 });
-                return send(200, { ...result.data, _model: model, _warning: result.warning });
+                return send(200, { ...result.data, _model: result.model, _warning: result.warning });
               } catch (e) {
                 if (e instanceof GroqError) {
                   return send(e.status === 429 ? 429 : 502, { error: e.message, code: e.status });
