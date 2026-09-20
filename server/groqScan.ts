@@ -30,11 +30,8 @@ export class GroqError extends Error {
 }
 
 /** Groq's current multimodal model (JSON mode, 20MB image cap). */
-export const DEFAULT_VISION_MODEL = "qwen/qwen3.6-27b";
+export const DEFAULT_VISION_MODEL = "qwen/qwen3.8-27b";
 
-// Best-effort fallback when the default is gone from the live list. NOTE: avoid a
-// broad /qwen/ here — qwen3-32b is text-only; match known multimodal families.
-// The definitive fix for any future deprecation is setting GROQ_MODEL.
 const VISION_PRIORITY: RegExp[] = [/maverick/i, /llama-4/i, /\bvl\b/i, /vision/i, /scout/i];
 
 const MODEL_HELP =
@@ -56,14 +53,7 @@ async function fetchModelIds(apiKey: string): Promise<string[]> {
   return (json.data ?? []).map((m) => m.id);
 }
 
-/**
- * Resolve the vision model. Order of resolution:
- *   1. GROQ_MODEL override, if provided (no network).
- *   2. else qwen/qwen3.6-27b — used unless the live models list explicitly no
- *      longer offers it (a models-endpoint hiccup falls back to it, not an error).
- *   3. else scan the live /models list for any vision-capable model.
- *   4. else throw a self-explanatory error naming GROQ_MODEL.
- */
+
 export async function selectVisionModel(
   apiKey: string,
   override?: string,
